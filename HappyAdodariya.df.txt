@@ -1,0 +1,44 @@
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.SQLContext
+val sqlContext = new SQLContext(sc)
+val employeeSchema = StructType(Array(
+    StructField("emp_id", IntegerType, true),
+    StructField("emp_name", StringType, true),
+    StructField("emp_job_desc", StringType, true),
+    StructField("dep_id", StringType, true),
+    StructField("emp_sal", FloatType, true)))
+val employee = sqlContext.read
+    .format("com.databricks.spark.csv")
+    .schema(employeeSchema)
+    .load("hdfs://localhost:8020/BDAT1008/Assignment/employee")
+employee.schema
+employee.show(10)
+val emp_sel=employee.select(column("emp_name"),column("emp_job_desc"),column("emp_sal"))
+emp_sel.schema
+emp_sel.show(20)
+val dep=sqlContext.read.format("com.databricks.spark.csv").option("delimiter",";").load("hdfs://localhost:8020/BDAT1008/Assignment/deaprtment")
+val department=dep.withColumn("address",split(regexp_replace('C2,"\\[|\\]",""),"#")).select('C0 as "dep_id",'C1 as "dep_name",split('address(1),",")(0) as "dep_add_street",split('address(2),",")(0) as "dep_add_city",'address(3) as "dep_add_state")
+department.schema
+department.show()
+val dep_sel=department.select('dep_name,'dep_id,'dep_add_city)
+dep_sel.show(10)
+val bonusSchema = StructType(Array(
+    StructField("emp_id", IntegerType, true),
+    StructField("emp_bonus", FloatType, true)))
+val bonus = sqlContext.read
+    .format("com.databricks.spark.csv")
+    .schema(bonusSchema)
+    .load("hdfs://localhost:8020/BDAT1008/Assignment/bonus")
+bonus.schema
+bonus.show(10)
+val employee_department = employee.join(department,Seq("dep_id"),"left_outer")
+employee_department.show(50)
+val employee_department_bonus = employee_department.join(bonus,Seq("emp_id"),"left_outer")
+val emp_bonus=employee_department_bonus.filter('emp_bonus!==0)
+emp_bonus.show(100)
+val emp_bonus_dept = employee_department_bonus.groupBy('dep_name)
+val avg_bonus_dept = emp_bonus_dept.agg(avg('emp_bonus).alias("average_bonus"))
+avg_bonus_dept.show()
+val emp_dept = emp_bonus_dept.count()
+emp_dept.show()
